@@ -51,13 +51,6 @@ class Cells
     private $index = [];
 
     /**
-     * Prefix used to uniquely identify cache data for this worksheet.
-     *
-     * @var string
-     */
-    private $cachePrefix;
-
-    /**
      * Initialise this new cell collection.
      *
      * @param Worksheet $parent The worksheet for this cell collection
@@ -70,7 +63,6 @@ class Cells
         // they are woken from a serialized state
         $this->parent = $parent;
         $this->cache = $cache;
-        $this->cachePrefix = $this->getUniqueID();
     }
 
     /**
@@ -131,7 +123,7 @@ class Cells
         unset($this->index[$pCoord]);
 
         // Delete the entry from cache
-        $this->cache->delete($this->cachePrefix . $pCoord);
+        $this->cache->delete($pCoord);
     }
 
     /**
@@ -323,17 +315,9 @@ class Cells
         // Get old values
         $oldKeys = $newCollection->getAllCacheKeys();
         $oldValues = $newCollection->cache->getMultiple($oldKeys);
-        $newValues = [];
-        $oldCachePrefix = $newCollection->cachePrefix;
-
-        // Change prefix
-        $newCollection->cachePrefix = $newCollection->getUniqueID();
-        foreach ($oldValues as $oldKey => $value) {
-            $newValues[str_replace($oldCachePrefix, $newCollection->cachePrefix, $oldKey)] = clone $value;
-        }
 
         // Store new values
-        $stored = $newCollection->cache->setMultiple($newValues);
+        $stored = $newCollection->cache->setMultiple($oldValues);
         if (!$stored) {
             $newCollection->__destruct();
 
@@ -390,7 +374,7 @@ class Cells
         if ($this->currentCellIsDirty && !empty($this->currentCoordinate)) {
             $this->currentCell->detach();
 
-            $stored = $this->cache->set($this->cachePrefix . $this->currentCoordinate, $this->currentCell);
+            $stored = $this->cache->set($this->currentCoordinate, $this->currentCell);
             if (!$stored) {
                 $this->__destruct();
 
@@ -449,7 +433,7 @@ class Cells
         }
 
         // Check if the entry that has been requested actually exists
-        $cell = $this->cache->get($this->cachePrefix . $pCoord);
+        $cell = $this->cache->get($pCoord);
         if ($cell === null) {
             throw new PhpSpreadsheetException("Cell entry {$pCoord} no longer exists in cache. This probably means that the cache was cleared by someone else.");
         }
@@ -501,7 +485,7 @@ class Cells
     {
         $keys = [];
         foreach ($this->getCoordinates() as $coordinate) {
-            $keys[] = $this->cachePrefix . $coordinate;
+            $keys[] = $coordinate;
         }
 
         return $keys;
