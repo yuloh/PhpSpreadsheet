@@ -11,11 +11,6 @@ use Psr\SimpleCache\CacheInterface;
 class Cells
 {
     /**
-     * @var \Psr\SimpleCache\CacheInterface
-     */
-    private $cache;
-
-    /**
      * Parent worksheet.
      *
      * @var Worksheet
@@ -44,33 +39,23 @@ class Cells
     private $currentCellIsDirty = false;
 
     /**
-     * An index of existing cells. Booleans indexed by their coordinate.
+     * An index of existing cells. Cells indexed by their coordinate.
      *
-     * @var bool[]
+     * @var Cell[]
      */
     private $index = [];
-
-    /**
-     * Prefix used to uniquely identify cache data for this worksheet.
-     *
-     * @var string
-     */
-    private $cachePrefix;
 
     /**
      * Initialise this new cell collection.
      *
      * @param Worksheet $parent The worksheet for this cell collection
-     * @param CacheInterface $cache
      */
-    public function __construct(Worksheet $parent, CacheInterface $cache)
+    public function __construct(Worksheet $parent)
     {
         // Set our parent worksheet.
         // This is maintained here to facilitate re-attaching it to Cell objects when
         // they are woken from a serialized state
         $this->parent = $parent;
-        $this->cache = $cache;
-        $this->cachePrefix = $this->getUniqueID();
     }
 
     /**
@@ -129,9 +114,6 @@ class Cells
         }
 
         unset($this->index[$pCoord]);
-
-        // Delete the entry from cache
-        $this->cache->delete($this->cachePrefix . $pCoord);
     }
 
     /**
@@ -294,16 +276,6 @@ class Cells
     }
 
     /**
-     * Generate a unique ID for cache referencing.
-     *
-     * @return string Unique Reference
-     */
-    private function getUniqueID()
-    {
-        return uniqid('phpspreadsheet.', true) . '.';
-    }
-
-    /**
      * Clone the cell collection.
      *
      * @param Worksheet $parent The new worksheet that we're copying to
@@ -318,26 +290,6 @@ class Cells
         $newCollection->parent = $parent;
         if (($newCollection->currentCell !== null) && (is_object($newCollection->currentCell))) {
             $newCollection->currentCell->attach($this);
-        }
-
-        // Get old values
-        $oldKeys = $newCollection->getAllCacheKeys();
-        $oldValues = $newCollection->cache->getMultiple($oldKeys);
-        $newValues = [];
-        $oldCachePrefix = $newCollection->cachePrefix;
-
-        // Change prefix
-        $newCollection->cachePrefix = $newCollection->getUniqueID();
-        foreach ($oldValues as $oldKey => $value) {
-            $newValues[str_replace($oldCachePrefix, $newCollection->cachePrefix, $oldKey)] = clone $value;
-        }
-
-        // Store new values
-        $stored = $newCollection->cache->setMultiple($newValues);
-        if (!$stored) {
-            $newCollection->__destruct();
-
-            throw new PhpSpreadsheetException('Failed to copy cells in cache');
         }
 
         return $newCollection;
@@ -390,12 +342,7 @@ class Cells
         if ($this->currentCellIsDirty && !empty($this->currentCoordinate)) {
             $this->currentCell->detach();
 
-            $stored = $this->cache->set($this->cachePrefix . $this->currentCoordinate, $this->currentCell);
-            if (!$stored) {
-                $this->__destruct();
-
-                throw new PhpSpreadsheetException("Failed to store cell {$this->currentCoordinate} in cache");
-            }
+            $this->index[$this->currentCoordinate] = $this->currentCell;
             $this->currentCellIsDirty = false;
         }
 
@@ -418,7 +365,7 @@ class Cells
         if ($pCoord !== $this->currentCoordinate) {
             $this->storeCurrentCell();
         }
-        $this->index[$pCoord] = true;
+        $this->index[$pCoord] = $cell;
 
         $this->currentCoordinate = $pCoord;
         $this->currentCell = $cell;
@@ -448,15 +395,9 @@ class Cells
             return null;
         }
 
-        // Check if the entry that has been requested actually exists
-        $cell = $this->cache->get($this->cachePrefix . $pCoord);
-        if ($cell === null) {
-            throw new PhpSpreadsheetException("Cell entry {$pCoord} no longer exists in cache. This probably means that the cache was cleared by someone else.");
-        }
-
         // Set current entry to the requested entry
         $this->currentCoordinate = $pCoord;
-        $this->currentCell = $cell;
+        $this->currentCell = $this->index[$pCoord];
         // Re-attach this as the cell's parent
         $this->currentCell->attach($this);
 
@@ -475,35 +416,9 @@ class Cells
             $this->currentCoordinate = null;
         }
 
-        // Flush the cache
-        $this->__destruct();
-
         $this->index = [];
 
         // detach ourself from the worksheet, so that it can then delete this object successfully
         $this->parent = null;
-    }
-
-    /**
-     * Destroy this cell collection.
-     */
-    public function __destruct()
-    {
-        $this->cache->deleteMultiple($this->getAllCacheKeys());
-    }
-
-    /**
-     * Returns all known cache keys.
-     *
-     * @return string[]
-     */
-    private function getAllCacheKeys()
-    {
-        $keys = [];
-        foreach ($this->getCoordinates() as $coordinate) {
-            $keys[] = $this->cachePrefix . $coordinate;
-        }
-
-        return $keys;
     }
 }

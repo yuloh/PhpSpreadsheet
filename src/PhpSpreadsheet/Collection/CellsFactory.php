@@ -2,7 +2,6 @@
 
 namespace PhpOffice\PhpSpreadsheet\Collection;
 
-use PhpOffice\PhpSpreadsheet\Settings;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
 abstract class CellsFactory
@@ -16,7 +15,7 @@ abstract class CellsFactory
      * */
     public static function getInstance(Worksheet $parent)
     {
-        $instance = new Cells($parent, Settings::getCache());
+        $instance = new Cells($parent);
 
         return $instance;
     }

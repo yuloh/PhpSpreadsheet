@@ -4,8 +4,6 @@ namespace PhpOffice\PhpSpreadsheet;
 
 use PhpOffice\PhpSpreadsheet\Calculation\Calculation;
 use PhpOffice\PhpSpreadsheet\Chart\Renderer\IRenderer;
-use PhpOffice\PhpSpreadsheet\Collection\Memory;
-use Psr\SimpleCache\CacheInterface;
 
 class Settings
 {
@@ -23,13 +21,6 @@ class Settings
      * @var int
      */
     private static $libXmlLoaderOptions = null;
-
-    /**
-     * The cache implementation to be used for cell collection.
-     *
-     * @var CacheInterface
-     */
-    private static $cache;
 
     /**
      * Set the locale code to use for formula translations and any special formatting.
@@ -99,29 +90,5 @@ class Settings
         }
 
         return self::$libXmlLoaderOptions;
-    }
-
-    /**
-     * Sets the implementation of cache that should be used for cell collection.
-     *
-     * @param CacheInterface $cache
-     */
-    public static function setCache(CacheInterface $cache)
-    {
-        self::$cache = $cache;
-    }
-
-    /**
-     * Gets the implementation of cache that should be used for cell collection.
-     *
-     * @return CacheInterface
-     */
-    public static function getCache()
-    {
-        if (!self::$cache) {
-            self::$cache = new Memory();
-        }
-
-        return self::$cache;
     }
 }
